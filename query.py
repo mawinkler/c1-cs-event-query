@@ -64,7 +64,7 @@ def collect(c1_url, api_key, cluster_name, decision, mitigation, namespace, poli
 
     Returns
     -------
-    Tables
+    Array with images violating the policy
     """
 
     # startTime = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -152,6 +152,7 @@ def collect(c1_url, api_key, cluster_name, decision, mitigation, namespace, poli
 
     # Sort results by pod name
     results = sorted(results, key=lambda k: k['pod']) 
+    images = []
 
     if len(results) > 0:
         # Generate a list of event types
@@ -180,9 +181,13 @@ def collect(c1_url, api_key, cluster_name, decision, mitigation, namespace, poli
                         result.get('container', 'n/a'),
                         result.get('rule', 'n/a')
                     ])
+                    if result.get('image', None) not in images:
+                        images.append(result.get('image', None))
             print("\nEvent Type: {}\n{}".format(type.upper(), x))
     else:
         _LOGGER.info("No evaluations found.")
+    
+    return images
 
 def get_policy(c1_url, api_key, policy_name):
 
@@ -267,15 +272,41 @@ def update_policy(c1_url, api_key, namespace, policy, image_exceptions, namespac
             _LOGGER.info("No namespaced policy found for {}".format(namespace))
         ruleset_id += 1
 
-    print(">>>>>")
     policy['namespaced'][ruleset_id]['exceptions'] = exceptions
-    pprint.pprint(policy)
-    print("<<<<<")
 
-    policy.get('id', False)
-    
+    _LOGGER.info("Updating policy for namespace {}".format(namespace))
+    url = "https://" + c1_url + "/api/container/policies/" \
+        + policy.get('id', False)
+    post_header = {
+        "Content-Type": "application/json",
+        "api-secret-key": api_key,
+        "api-version": "v1",
+    }
 
-    # for exclusion in 
+    policy.pop('id', None)
+    policy.pop('name', None)
+    policy.pop('updated', None)
+    policy.pop('created', None)
+
+    try:
+        response = requests.post(
+            url, headers=post_header, data=json.dumps(policy), verify=True
+        )
+        response.raise_for_status()
+    except requests.exceptions.Timeout as err:
+        raise SystemExit(err)
+    except requests.exceptions.RequestException as err:
+        # catastrophic error. bail.
+        raise SystemExit(err)
+    except requests.exceptions.HTTPError as err:
+        raise SystemExit(err)
+
+    response = response.json()
+    # Error handling
+    if "message" in response:
+        if response.get('message', "") == "Invalid API Key":
+            _LOGGER.error("API error: {}".format(response['message']))
+            raise ValueError("Invalid API Key")
 
 
 if __name__ == '__main__':
@@ -296,9 +327,9 @@ if __name__ == '__main__':
     c1_url=open('/etc/workload-security-credentials/c1_url', 'r').read()
     api_key=open('/etc/workload-security-credentials/api_key', 'r').read()
 
-    collect(c1_url, api_key, args.cluster_name, args.decision, args.mitigation, args.namespace, args.policy)
+    images = collect(c1_url, api_key, args.cluster_name, args.decision, args.mitigation, args.namespace, args.policy)
 
     policy = get_policy(c1_url, api_key, args.policy)
-    pprint.pprint(policy)
-    policy = update_policy(c1_url, api_key, args.namespace, policy, ['spatz:4711', 'falcosecurity/falcosidekick:2.22.0'],)
+    policy = update_policy(c1_url, api_key, args.namespace, policy, images)
 
+    _LOGGER.info("Policy for namespace {} updated.".format(args.namespace))
