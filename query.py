@@ -16,6 +16,9 @@ options:
 
 author:
     - Markus Winkler (markus_winkler@trendmicro.com)
+
+TODO:
+Switch to describe policy when evaluating the policy
 """
 
 EXAMPLES = """
@@ -71,7 +74,7 @@ def collect(c1_url, api_key, cluster_name, decision, mitigation, namespace, poli
 
     # startTime = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
     # The interval for continuous rescans of the cluster is 30 minutes by default
-    startTime = (datetime.utcnow() - timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    startTime = (datetime.utcnow() - timedelta(minutes=3000)).strftime("%Y-%m-%dT%H:%M:%SZ")
     endTime = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
     _LOGGER.info(f"Start time: {startTime}")
@@ -129,13 +132,13 @@ def collect(c1_url, api_key, cluster_name, decision, mitigation, namespace, poli
                         resources = reason['resources']
                         for resource in resources:
                             result = {
-                                "timestamp": event.get('timestamp', 'n/a'),
-                                "type": reason.get('type', 'n/a'),
+                                "timestamp": event.get('timestamp', None),
+                                "type": reason.get('type', None),
                                 "namespace": event.get('namespace', ""),
-                                "container": resource.get('container', 'n/a'),
-                                "pod": resource.get('object', 'n/a'),
-                                "image": resource.get('image', 'n/a'),
-                                "rule": reason.get('rule', 'n/a')
+                                "container": resource.get('container', None),
+                                "pod": resource.get('object', None),
+                                "image": resource.get('image', None),
+                                "rule": reason.get('rule', None)
                             }
                             if result not in results:
                                 results.append(result)
@@ -158,7 +161,7 @@ def collect(c1_url, api_key, cluster_name, decision, mitigation, namespace, poli
         # Generate a list of event types
         types = []
         for result in results:
-            type = result.get('type', 'n/a')
+            type = result.get('type', None)
             if type not in types:
                 types.append(type)
 
@@ -169,10 +172,10 @@ def collect(c1_url, api_key, cluster_name, decision, mitigation, namespace, poli
             for c in x.field_names:
                 x.align[c] = "l"
             for result in results:
-                if result.get('type', 'n/a') == type:
+                if result.get('type', None) == type:
                     x.add_row([
                         datetime.strptime(
-                            result.get('timestamp', 'n/a'),
+                            result.get('timestamp', None),
                             '%Y-%m-%dT%H:%M:%S.%fZ'
                         ).strftime("%H:%M:%S"),
                         result.get('namespace', 'n/a'),
@@ -181,7 +184,8 @@ def collect(c1_url, api_key, cluster_name, decision, mitigation, namespace, poli
                         result.get('container', 'n/a'),
                         result.get('rule', 'n/a')
                     ])
-                    if result.get('image', None) not in images:
+                    if result.get('image', None) not in images \
+                    and result.get('image', None) != None:
                         images.append(result.get('image', None))
             print("\nEvent Type: {}\n{}".format(type.upper(), x))
     else:
@@ -247,7 +251,7 @@ def get_policy(c1_url, api_key, policy_name):
                 break
 
     if result == {}:
-        _LOGGER.info("Policy {} not found".format(policy))
+        _LOGGER.error("Policy {} not found".format(policy))
         raise ValueError("Policy {} not found".format(policy))
 
     return policy
@@ -269,26 +273,49 @@ def update_policy(c1_url, api_key, namespace, policy, image_exceptions, namespac
     Returns
     -------
     Policy
-
-    TODO:
-    Create 'namespaced' if not existing
-    Create 'namespaced.namespaces.namespace' if not existing
     """
 
+    # Check, if policy is already namespaced
     if not policy.get('namespaced', False):
-        _LOGGER.info("Not a namespaced policy")
+        policy['namespaced'] = [{
+            "name": namespace.replace('-', '_'),
+            "namespaces": [
+                namespace
+            ],
+            "rules": policy['default']['rules']
+        }]
+        _LOGGER.info("Policy {} is now a namespaced policy for namespace {}".format(policy.get('name'), namespace))
     
+    # Check, if namespaced policy already covers the namespace
+    namespace_existing = False
+    for namespaced in policy.get('namespaced', False):
+        if namespace in namespaced.get('namespaces', False):
+            namespace_existing = True
+            break
+    if not namespace_existing:
+        policy['namespaced'].append({
+            "name": namespace.replace('-', '_'),
+            "namespaces": [
+                namespace
+            ],
+            "rules": policy['default']['rules']
+        })
+        _LOGGER.info("Namespaced policy for namespace {} added".format(namespace))
+
+    # Check, if all exceptions for the given list of images is set to the policy
     ruleset_id = 0
     for namespaced in policy.get('namespaced', False):
         if namespace in namespaced.get('namespaces', False):
             exceptions = namespaced.get('exceptions', False)
+            if not exceptions:
+                exceptions = []
             for exception in exceptions:
                 for image_exception in image_exceptions:
                     if image_exception == exception.get('statement', False).get('value', False):
                         image_exceptions.remove(image_exception)
                         _LOGGER.info("Exception for {} already exists".format(image_exception))
-            _LOGGER.info("Adding image exceptions for {}".format(image_exceptions))
             for image in image_exceptions:
+                _LOGGER.info("Adding image exception for {}".format(image))
                 exceptions.append(
                     {
                         "action": "log",
@@ -302,8 +329,6 @@ def update_policy(c1_url, api_key, namespace, policy, image_exceptions, namespac
                     }
                 )
             break
-        else:
-            _LOGGER.info("No namespaced policy found for {}".format(namespace))
         ruleset_id += 1
 
     # Set exceptions
@@ -328,6 +353,7 @@ def update_policy(c1_url, api_key, namespace, policy, image_exceptions, namespac
         response = requests.post(
             url, headers=post_header, data=json.dumps(policy), verify=True
         )
+        # print(response.text)
         response.raise_for_status()
     except requests.exceptions.Timeout as err:
         raise SystemExit(err)
@@ -352,6 +378,7 @@ if __name__ == '__main__':
     parser.add_argument("-m", "--mitigation", nargs='?', default='log', type=str, help="Mitigation by the policy. Defaults to 'log'.")
     parser.add_argument("-n", "--namespace", nargs='?', default='all', type=str, help="Namespace in scope. Defaults to 'all'.")
     parser.add_argument("-p", "--policy", type=str, help="Policy to evaluate.")
+    parser.add_argument("-u", "--update", nargs='?', default='false', type=str, help="If set to 'true', the policy will be updated with exceptions for the violating images.")
     args = parser.parse_args()
 
     if args.cluster_name == None:
@@ -364,7 +391,8 @@ if __name__ == '__main__':
     api_key=open('/etc/workload-security-credentials/api_key', 'r').read()
 
     images = collect(c1_url, api_key, args.cluster_name, args.decision, args.mitigation, args.namespace, args.policy)
-    policy = get_policy(c1_url, api_key, args.policy)
-    policy = update_policy(c1_url, api_key, args.namespace, policy, images)
+    if args.update == 'true':
+        policy = get_policy(c1_url, api_key, args.policy)
+        policy = update_policy(c1_url, api_key, args.namespace, policy, images)
 
     _LOGGER.info("Done")
