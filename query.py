@@ -52,11 +52,13 @@ def collect(c1_url, api_key, cluster_name, decision, mitigation, namespace, poli
 
     Parameters
     ----------
-    -c, --cluster_name      Cluster name.
-    -d, --decision          Decision by the policy. Defaults to 'deny'.
-    -m, --mitigation        Mitigation by the policy. Defaults to 'log'.
-    -n, --namespace         Namespace in scope. Defaults to 'all'.
-    -p, --policy            Policy to evaluate.
+    c1_url          Cloud One API endpoint
+    api_key         API-Key
+    cluster_name    Cluster name.
+    decision        Decision by the policy.
+    mitigation      Mitigation by the policy.
+    namespace       Namespace in scope.
+    policy          Policy to evaluate.
 
     Raises
     ------
@@ -72,8 +74,6 @@ def collect(c1_url, api_key, cluster_name, decision, mitigation, namespace, poli
     startTime = (datetime.utcnow() - timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
     endTime = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    startTime = "2021-06-23T09:22:46Z"
-    endTime = "2021-06-23T09:52:46Z"
     _LOGGER.info(f"Start time: {startTime}")
     _LOGGER.info(f"End time: {endTime}")
 
@@ -190,6 +190,23 @@ def collect(c1_url, api_key, cluster_name, decision, mitigation, namespace, poli
     return images
 
 def get_policy(c1_url, api_key, policy_name):
+    """
+    Retrieves the policy with a given name.
+
+    Parameters
+    ----------
+    c1_url          Cloud One API endpoint
+    api_key         API-Key
+    policy_name     Name of the policy to return
+
+    Raises
+    ------
+    Exception
+
+    Returns
+    -------
+    Policy
+    """
 
     url = "https://" + c1_url + "/api/container/policies?" \
         + "&limit=" + str(100)
@@ -237,8 +254,25 @@ def get_policy(c1_url, api_key, policy_name):
 
 def update_policy(c1_url, api_key, namespace, policy, image_exceptions, namespaces=True):
     """
+    Retrieves the policy with a given name.
+
+    Parameters
+    ----------
+    c1_url          Cloud One API endpoint
+    api_key         API-Key
+    policy_name     Name of the policy to return
+
+    Raises
+    ------
+    Exception
+
+    Returns
+    -------
+    Policy
+
     TODO:
-    must be a policy which is already namespaced for the namespace in question
+    Create 'namespaced' if not existing
+    Create 'namespaced.namespaces.namespace' if not existing
     """
 
     if not policy.get('namespaced', False):
@@ -272,8 +306,10 @@ def update_policy(c1_url, api_key, namespace, policy, image_exceptions, namespac
             _LOGGER.info("No namespaced policy found for {}".format(namespace))
         ruleset_id += 1
 
+    # Set exceptions
     policy['namespaced'][ruleset_id]['exceptions'] = exceptions
 
+    # Update policy
     _LOGGER.info("Updating policy for namespace {}".format(namespace))
     url = "https://" + c1_url + "/api/container/policies/" \
         + policy.get('id', False)
@@ -328,8 +364,7 @@ if __name__ == '__main__':
     api_key=open('/etc/workload-security-credentials/api_key', 'r').read()
 
     images = collect(c1_url, api_key, args.cluster_name, args.decision, args.mitigation, args.namespace, args.policy)
-
     policy = get_policy(c1_url, api_key, args.policy)
     policy = update_policy(c1_url, api_key, args.namespace, policy, images)
 
-    _LOGGER.info("Policy for namespace {} updated.".format(args.namespace))
+    _LOGGER.info("Done")
