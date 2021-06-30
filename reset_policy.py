@@ -39,7 +39,7 @@ logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
-def get_policy(url, key, policy_name):
+def get_policy(c1_url, key, policy_name):
     """
     Retrieves the policy with a given name.
 
@@ -58,8 +58,8 @@ def get_policy(url, key, policy_name):
     Policy
     """
 
-    url = "https://" + url + "/api/container/policies?" \
-        + "&limit=" + str(100)
+    url = "https://" + c1_url + "/api/container/policies?" \
+        + "&limit=" + str(25)
     post_header = {
         "Content-Type": "application/json",
         "api-secret-key": key,
@@ -72,11 +72,14 @@ def get_policy(url, key, policy_name):
         )
         response.raise_for_status()
     except requests.exceptions.Timeout as err:
+        print(response.text)
         raise SystemExit(err)
     except requests.exceptions.HTTPError as err:
+        print(response.text)
         raise SystemExit(err)
     except requests.exceptions.RequestException as err:
         # catastrophic error. bail.
+        print(response.text)
         raise SystemExit(err)
 
     response = response.json()
@@ -102,7 +105,7 @@ def get_policy(url, key, policy_name):
 
     return configured_policy
 
-def reset_policy(url, key, configured_policy):
+def reset_policy(c1_url, key, configured_policy):
     """
     Resets all rules ti log and enabled.
 
@@ -146,7 +149,7 @@ def reset_policy(url, key, configured_policy):
 
     # Update policy
     _LOGGER.info("Updating policy")
-    url = "https://" + url + "/api/container/policies/" \
+    url = "https://" + c1_url + "/api/container/policies/" \
         + configured_policy.get('id', False)
     post_header = {
         "Content-Type": "application/json",

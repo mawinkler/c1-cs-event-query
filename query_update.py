@@ -75,7 +75,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO,
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-def collect(url, key, cluster_name, decision, mitigation, namespace, policy_name):
+def collect(c1_url, key, cluster_name, decision, mitigation, namespace, policy_name):
     """
     Queries for events with a given set of filters and prints out a table per
     event type discovered.
@@ -100,7 +100,7 @@ def collect(url, key, cluster_name, decision, mitigation, namespace, policy_name
     """
 
     # The interval for continuous rescans of the cluster is 30 minutes by default
-    start_time = (datetime.utcnow() - timedelta(minutes=60)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    start_time = (datetime.utcnow() - timedelta(minutes=600)).strftime("%Y-%m-%dT%H:%M:%SZ")
     end_time = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
     _LOGGER.info("Start time: %s", start_time)
@@ -110,12 +110,17 @@ def collect(url, key, cluster_name, decision, mitigation, namespace, policy_name
     results = []
     loops = 0
     while True:
-            # + "cursor=" + cursor \
-        url = "https://" + url + "/api/container/events/evaluations?" \
-            + "&limit=" + str(100) \
-            + "&policyName=" + policy_name \
-            + "&fromTime=" + start_time \
-            + "&toTime=" + end_time
+        if (cursor != ""):
+            print("cursor")
+            url = "https://" + c1_url + "/api/container/events/evaluations?" \
+                + "cursor=" + cursor
+        else:
+            print("first")
+            url = "https://" + c1_url + "/api/container/events/evaluations?" \
+                + "limit=" + str(25) \
+                + "&policyName=" + policy_name \
+                + "&fromTime=" + start_time \
+                + "&toTime=" + end_time
         post_header = {
             "Content-Type": "application/json",
             "api-secret-key": key,
@@ -126,13 +131,17 @@ def collect(url, key, cluster_name, decision, mitigation, namespace, policy_name
             response = requests.get(
                 url, headers=post_header, verify=True
             )
+            response.encoding = response.apparent_encoding
             response.raise_for_status()
         except requests.exceptions.Timeout as err:
+            print(response.text)
             raise SystemExit(err)
         except requests.exceptions.HTTPError as err:
+            print(response.text)
             raise SystemExit(err)
         except requests.exceptions.RequestException as err:
             # catastrophic error. bail.
+            print(response.text)
             raise SystemExit(err)
 
         response = response.json()
@@ -144,7 +153,7 @@ def collect(url, key, cluster_name, decision, mitigation, namespace, policy_name
 
         # Parse the response
         events_count = len(response.get('events', {}))
-        _LOGGER.info("Number of events: %d", events_count)
+        _LOGGER.info("Number of events in result set: %d", len(results))
         if events_count > 0:
             for event in response.get('events', {}):
                 if event.get('clusterName', "") == cluster_name \
@@ -152,7 +161,7 @@ def collect(url, key, cluster_name, decision, mitigation, namespace, policy_name
                 and event.get('mitigation', "") == mitigation \
                 and (event.get('namespace', "") == namespace \
                     or namespace == 'all'):
-
+                    print("Timestamp: {}".format(event.get('timestamp', None)))
                     reasons = event.get('reasons', {})
                     for reason in reasons:
                         resources = reason['resources']
@@ -168,12 +177,12 @@ def collect(url, key, cluster_name, decision, mitigation, namespace, policy_name
                             }
                             if result not in results:
                                 results.append(result)
-        cursor = response.get('next', '')
+        cursor = response.get('next', "")
+        print("Cursor {}".format(cursor))
         loops += 1
-        # print(loops, len(results), cursor)
         if cursor == "":
             break
-        if loops > 0:
+        if loops > 3:
             break
 
     results_count = len(results)
@@ -219,7 +228,7 @@ def collect(url, key, cluster_name, decision, mitigation, namespace, policy_name
 
     return images
 
-def get_policy(url, key, policy_name):
+def get_policy(c1_url, key, policy_name):
     """
     Retrieves the policy with a given name.
 
@@ -238,8 +247,8 @@ def get_policy(url, key, policy_name):
     Policy
     """
 
-    url = "https://" + url + "/api/container/policies?" \
-        + "&limit=" + str(100)
+    url = "https://" + c1_url + "/api/container/policies?" \
+        + "&limit=" + str(25)
     post_header = {
         "Content-Type": "application/json",
         "api-secret-key": key,
@@ -282,7 +291,7 @@ def get_policy(url, key, policy_name):
 
     return configured_policy
 
-def update_policy(url, key, configured_policy, image_exceptions,
+def update_policy(c1_url, key, configured_policy, image_exceptions,
                   namespace='default', namespaced_policy=True):
     """
     Updates the policy with a given name.
@@ -392,7 +401,7 @@ def update_policy(url, key, configured_policy, image_exceptions,
 
     # Update policy
     _LOGGER.info("Updating policy for namespace %s", namespace)
-    url = "https://" + url + "/api/container/policies/" \
+    url = "https://" + c1_url + "/api/container/policies/" \
         + configured_policy.get('id', False)
     post_header = {
         "Content-Type": "application/json",

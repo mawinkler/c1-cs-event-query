@@ -7,6 +7,9 @@
     - [Add scanner](#add-scanner)
   - [Analyze Evaluations](#analyze-evaluations)
   - [TODO](#todo)
+    - [Patch deployment to local registry](#patch-deployment-to-local-registry)
+  - [Support](#support)
+  - [Contribute](#contribute)
 
 ## Deployment
 
@@ -56,8 +59,14 @@ I recommend to use this script on a per-namespace basis.
 
 ## TODO
 
+### Patch deployment to local registry
 
-
+- describe deployment
+- pull image
+- push to local registry
+- patch
+- delete deployment
+- apply patched deployment
 
 The reason for the above is pretty simple. If you would set `Block images that are not scanned`, very likely your cluster would break pretty soon. So here are my best practices on how to set up a policy without breaking the cluster.
 
@@ -66,3 +75,22 @@ The reason for the above is pretty simple. If you would set `Block images that a
 3. Analyze the events after running the deployed cluster for a while
    1. Evaluate the Events and see, what would have been blocked
 4. Based on the events, develop namespaced policies, namespace exclusions and adaptions to the policy
+
+## Support
+
+This is an Open Source community project. Project contributors may be able to help, depending on their time and availability. Please be specific about what you're trying to do, your system, and steps to reproduce the problem.
+
+For bug reports or feature requests, please [open an issue](../../issues). You are welcome to [contribute](#contribute).
+
+Official support from Trend Micro is not available. Individual contributors may be Trend Micro employees, but are not official support.
+
+## Contribute
+
+I do accept contributions from the community. To submit changes:
+
+1. Fork this repository.
+1. Create a new feature branch.
+1. Make your changes.
+1. Submit a pull request with an explanation of your changes or additions.
+
+I will review and work with you to release the code.
