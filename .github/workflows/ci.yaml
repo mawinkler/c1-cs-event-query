@@ -512,8 +512,8 @@ jobs:
 
           python -m venv venv
           . venv/bin/activate
-          pip install -U "pip<20.3" setuptools wheel
-          pip install -e .
+          sudo -H pip install -U "pip<20.3" setuptools wheel
+          sudo -H pip install -e .
 
   pylint:
     name: Check pylint
