@@ -90,7 +90,6 @@ event_functions = EventFunctions(c1_url, api_key)
 policy_functions = PolicyFunctions(c1_url, api_key)
 
 
-# def collect_events(cluster_name, decision, mitigation, namespace, policy_name):
 def print_tables(reasons):
     """
     Prints out a table per event type discovered.
@@ -135,14 +134,14 @@ def print_tables(reasons):
     else:
         _LOGGER.info("No evaluations found.")
 
-def policy_add_exceptions(configured_policy, image_exceptions,
-                          namespace='default', namespaced_policy=True):
+def policy_add_exceptions(image_exceptions,
+                          namespace='default',
+                          namespaced_policy=True):
     """
     Updates the policy with a given name.
 
     Parameters
     ----------
-    policy              The policy to update
     image_exceptions    The image names for the exceptions
     namespace           The namespace of the images
     namespaced_policy   By default, create a namespaced policy
@@ -152,11 +151,12 @@ def policy_add_exceptions(configured_policy, image_exceptions,
     Exception
     """
 
+    configured_policy = policy_functions.get_policy()
+
     if namespaced_policy:
         _LOGGER.info("Updating namespaced policy")
         # Check, if policy is already namespaced
-        # if not configured_policy.get('namespaced', False):
-        if not policy_functions.is_namespaced(configured_policy):
+        if not policy_functions.is_namespaced():
             configured_policy['namespaced'] = [{
                 "name": namespace.replace('-', '_'),
                 "namespaces": [
@@ -168,12 +168,7 @@ def policy_add_exceptions(configured_policy, image_exceptions,
                          configured_policy.get('name'), namespace)
 
         # Check, if namespaced policy already covers the namespace
-        namespace_existing = False
-        for namespaced in configured_policy.get('namespaced', False):
-            if namespace in namespaced.get('namespaces', False):
-                namespace_existing = True
-                break
-        if not namespace_existing:
+        if not policy_functions.has_namespace(namespace):
             configured_policy['namespaced'].append({
                 "name": namespace.replace('-', '_'),
                 "namespaces": [
@@ -242,44 +237,7 @@ def policy_add_exceptions(configured_policy, image_exceptions,
         # Set exceptions
         configured_policy['default']['exceptions'] = exceptions
 
-    # Update policy
-    _LOGGER.info("Updating policy for namespace %s", namespace)
-    url = "https://" + c1_url + "/api/container/policies/" \
-        + configured_policy.get('id', False)
-    post_header = {
-        "Content-Type": "application/json",
-        "api-secret-key": api_key,
-        "api-version": "v1",
-    }
-
-    configured_policy.pop('id', None)
-    configured_policy.pop('name', None)
-    configured_policy.pop('updated', None)
-    configured_policy.pop('created', None)
-
-    try:
-        response = requests.post(
-            url, headers=post_header, data=json.dumps(configured_policy), verify=True
-        )
-        # print(response.text)
-        response.raise_for_status()
-    except requests.exceptions.Timeout as err:
-        _LOGGER.error(response.text)
-        raise SystemExit(err)
-    except requests.exceptions.HTTPError as err:
-        _LOGGER.error(response.text)
-        raise SystemExit(err)
-    except requests.exceptions.RequestException as err:
-        # catastrophic error. bail.
-        _LOGGER.error(response.text)
-        raise SystemExit(err)
-
-    response = response.json()
-    # Error handling
-    if "message" in response:
-        if response.get('message', "") == "Invalid API Key":
-            _LOGGER.error("API error: %s", response['message'])
-            raise ValueError("Invalid API Key")
+    policy_functions.set_policy(configured_policy)
 
 
 if __name__ == '__main__':
@@ -329,17 +287,17 @@ if __name__ == '__main__':
     _LOGGER.info("Extracting image names")
     violating_images = event_functions.extract_images(reasons)
 
-    if args.update_namespaced:
-        policy_cs = policy_functions.get_policy(args.policy)
-        policy_add_exceptions(policy_cs,
-                              image_exceptions=violating_images,
-                              namespace=args.namespace,
-                              namespaced_policy=True)
-    if args.update_cluster_wide:
-        policy_cs = policy_functions.get_policy(args.policy)
-        policy_add_exceptions(policy_cs,
-                              image_exceptions=violating_images,
-                              namespaced_policy=False)
+    if args.update_namespaced or args.update_cluster_wide:
+        policy_functions.pull_policy(args.policy)
+        if args.update_namespaced:
+            policy_add_exceptions(image_exceptions=violating_images,
+                                  namespace=args.namespace,
+                                  namespaced_policy=True)
+        if args.update_cluster_wide:
+            policy_add_exceptions(image_exceptions=violating_images,
+                                  namespaced_policy=False)
+        _LOGGER.info("Updating policy")
+        policy_functions.push_policy()
 
     print_tables(reasons)
 

@@ -194,14 +194,87 @@ class EventFunctions:
 class PolicyFunctions:
     """Some functions to help dealing with policies"""
 
-    def __init__(self, c1_url, api_key):
+    def __init__(self, c1_url, api_key, policy={}):
         self.c1_url = c1_url
         self.api_key = api_key
+        self.policy = policy
 
-    def is_namespaced(self, policy):
-        return policy.get('namespaced', False)
-        
-    def get_policy(self, policy_name):
+    def get_policy(self):
+        """
+        Returns the policy
+
+        Parameters
+        ----------
+        None
+
+        Raises
+        ------
+        None
+
+        Returns
+        -------
+        policy               Policy
+        """
+        return self.policy
+
+    def set_policy(self, policy):
+        """
+        Sets the policy
+
+        Parameters
+        ----------
+        policy               Policy
+
+        Raises
+        ------
+        None
+
+        Returns
+        -------
+        True                 If namespace exists
+        """
+        self.policy = policy
+
+    def is_namespaced(self):
+        """
+        Checks, if the policy is namespaced.
+
+        Parameters
+        ----------
+        None
+
+        Raises
+        ------
+        None
+
+        Returns
+        -------
+        True                 If namespace exists
+        """
+        return self.policy.get('namespaced', False)
+
+    def has_namespace(self, namespace):
+        """
+        Checks, if the policy contains the given namespace.
+
+        Parameters
+        ----------
+        namespace            Namespace to check
+
+        Raises
+        ------
+        None
+
+        Returns
+        -------
+        True                 If namespace exists
+        """
+        for namespaced in self.policy.get('namespaced', False):
+            if namespace in namespaced.get('namespaces', False):
+                return True
+        return False
+
+    def pull_policy(self, policy_name):
         """
         Retrieves the policy with a given name.
 
@@ -215,7 +288,7 @@ class PolicyFunctions:
 
         Returns
         -------
-        Policy
+        None
         """
 
         url = "https://" + self.c1_url + "/api/container/policies?" \
@@ -263,74 +336,48 @@ class PolicyFunctions:
             _LOGGER.error("Policy %s not found", policy_name)
             raise ValueError("Policy {} not found".format(policy_name))
 
-        return configured_policy
+        self.policy = configured_policy
 
-    def reset_policy(self, configured_policy):
+    def push_policy(self):
         """
-        Resets all rules ti log and enabled.
+        Post the policy to Container Security.
 
         Parameters
         ----------
-        policy              The policy to update
-        image_exceptions    The image names for the exceptions
-        namespace           The namespace of the images
-        namespaced_policy   By default, create a namespaced policy
+        self
 
         Raises
         ------
         Exception
         """
-
-        # Reset all rules to log and enable them
-        _LOGGER.info("Resetting cluster-wide policy definition")
-        rule_count = len(configured_policy.get('default', False).get('rules', False))
-
-        for rule_id in range(rule_count):
-            configured_policy['default']['rules'][rule_id]['action'] = 'log'
-            configured_policy['default']['rules'][rule_id]['mitigation'] = 'log'
-            configured_policy['default']['rules'][rule_id]['enabled'] = True
-
-        # Check, if policy is namespaced
-        if configured_policy.get('namespaced', False):
-            # Reset all namespaced rules to log and enable them
-            namespaced_id = 0
-            for namespaced in configured_policy.get('namespaced', False):
-                _LOGGER.info("Resetting namespaced policy definition for %s",
-                             namespaced.get('name', False))
-                rule_count = len(namespaced.get('rules', False))
-                for rule_id in range(rule_count):
-                    configured_policy['namespaced'][namespaced_id]['rules'][rule_id]['action'] = 'log'
-                    configured_policy['namespaced'][namespaced_id]['rules'][rule_id]['mitigation'] = 'log'
-                    configured_policy['namespaced'][namespaced_id]['rules'][rule_id]['enabled'] = True
-                namespaced_id += 1
-
-        # Update policy
-        _LOGGER.info("Updating policy")
         url = "https://" + self.c1_url + "/api/container/policies/" \
-            + configured_policy.get('id', False)
+            + self.policy.get('id', False)
         post_header = {
             "Content-Type": "application/json",
             "api-secret-key": self.api_key,
             "api-version": "v1",
         }
 
-        configured_policy.pop('id', None)
-        configured_policy.pop('name', None)
-        configured_policy.pop('updated', None)
-        configured_policy.pop('created', None)
+        self.policy.pop('id', None)
+        self.policy.pop('name', None)
+        self.policy.pop('updated', None)
+        self.policy.pop('created', None)
 
         try:
             response = requests.post(
-                url, headers=post_header, data=json.dumps(configured_policy), verify=True
+                url, headers=post_header, data=json.dumps(self.policy), verify=True
             )
             # print(response.text)
             response.raise_for_status()
         except requests.exceptions.Timeout as err:
+            _LOGGER.error(response.text)
             raise SystemExit(err)
         except requests.exceptions.HTTPError as err:
+            _LOGGER.error(response.text)
             raise SystemExit(err)
         except requests.exceptions.RequestException as err:
             # catastrophic error. bail.
+            _LOGGER.error(response.text)
             raise SystemExit(err)
 
         response = response.json()
@@ -339,3 +386,39 @@ class PolicyFunctions:
             if response.get('message', "") == "Invalid API Key":
                 _LOGGER.error("API error: %s", response['message'])
                 raise ValueError("Invalid API Key")
+
+    def reset_policy(self):
+        """
+        Resets all rules to log and enabled.
+
+        Parameters
+        ----------
+        self
+
+        Raises
+        ------
+        Exception
+        """
+
+        # Reset all rules to log and enable them
+        _LOGGER.info("Resetting cluster-wide policy definition")
+        rule_count = len(self.policy.get('default', False).get('rules', False))
+
+        for rule_id in range(rule_count):
+            self.policy['default']['rules'][rule_id]['action'] = 'log'
+            self.policy['default']['rules'][rule_id]['mitigation'] = 'log'
+            self.policy['default']['rules'][rule_id]['enabled'] = True
+
+        # Check, if policy is namespaced
+        if self.policy.get('namespaced', False):
+            # Reset all namespaced rules to log and enable them
+            namespaced_id = 0
+            for namespaced in self.policy.get('namespaced', False):
+                _LOGGER.info("Resetting namespaced policy definition for %s",
+                             namespaced.get('name', False))
+                rule_count = len(namespaced.get('rules', False))
+                for rule_id in range(rule_count):
+                    self.policy['namespaced'][namespaced_id]['rules'][rule_id]['action'] = 'log'
+                    self.policy['namespaced'][namespaced_id]['rules'][rule_id]['mitigation'] = 'log'
+                    self.policy['namespaced'][namespaced_id]['rules'][rule_id]['enabled'] = True
+                namespaced_id += 1

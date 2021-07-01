@@ -55,7 +55,8 @@ if __name__ == '__main__':
 
     policy_functions = PolicyFunctions(c1_url, api_key)
 
-    policy_cs = policy_functions.get_policy(args.policy)
-    policy_functions.reset_policy(policy_cs)
+    policy_functions.pull_policy(args.policy)
+    policy_functions.reset_policy()
+    policy_functions.push_policy()
 
     _LOGGER.info("Done")
