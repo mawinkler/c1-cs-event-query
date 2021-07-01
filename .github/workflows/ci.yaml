@@ -508,7 +508,7 @@ jobs:
         run: |
           # Temporary addition of cmake, needed to build some Python 3.9 packages
           apt-get update
-          apt-get -y install cmake
+          apt-get -y install cmake sudo
 
           python -m venv venv
           . venv/bin/activate
