@@ -6,7 +6,7 @@ on:
     branches:
       - dev
       - rc
-      - master
+      - main
   pull_request: ~
 
 env:
