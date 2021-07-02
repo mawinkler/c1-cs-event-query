@@ -21,7 +21,7 @@ jobs:
           use-black: false
           use-mypy: false
           use-isort: false
-          extra-pylint-options: "code"
+          extra-pylint-options: "--path ./code --threshold 2"
           extra-pycodestyle-options: ""
           extra-flake8-options: ""
           extra-black-options: ""
