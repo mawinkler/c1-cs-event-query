@@ -19,8 +19,8 @@ description:
       by default the exclusions will be namespaced.
 
 configuration:
-    Create the following files below /etc/workload-security-credentials/:
-    c1_url - cloudone.trendmicro.com:443
+    Create the following files below /etc/cloudone-credentials/:
+    c1_url - container.trend-us-1.cloudone.trendmicro.com:443
     api_key - your API key
 
 usage:
@@ -29,10 +29,10 @@ usage:
                         [-d [{deny,log}]] [-m [{block,log}]] \
                         [-n [NAMESPACE]] [-un] [-uc]
 
-    examples:   query_update.py -c playground -p relaxed_playground
-                query_update.py -c playground -p relaxed_playground -n falco
-                query_update.py -c playground -p relaxed_playground -n falco -un
-                query_update.py -c playground -p relaxed_playground -n falco -uc
+    examples:   query_update.py -c playground_ubuntu -p relaxed_playground
+                query_update.py -c playground_ubuntu -p relaxed_playground -n falco
+                query_update.py -c playground_ubuntu -p relaxed_playground -n falco -un
+                query_update.py -c playground_ubuntu -p relaxed_playground -n falco -uc
 
     optional arguments:
     -h, --help            show this help message and exit
@@ -64,14 +64,13 @@ todo:
 """
 
 import argparse
-import json
+import re
 import sys
 import logging
 from argparse import RawDescriptionHelpFormatter
 from datetime import datetime, timedelta
 import requests
 from prettytable import PrettyTable
-
 from helper_functions import EventFunctions, PolicyFunctions
 
 # Globals
@@ -83,8 +82,8 @@ logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 # API credentials are mounted to /etc
-c1_url = open('/etc/workload-security-credentials/c1_url', 'r').read()
-api_key = open('/etc/workload-security-credentials/api_key', 'r').read()
+c1_url = open('/etc/cloudone-credentials/c1_url', 'r').read()[:-1]
+api_key = open('/etc/cloudone-credentials/api_key', 'r').read()[:-1]
 
 event_functions = EventFunctions(c1_url, api_key)
 policy_functions = PolicyFunctions(c1_url, api_key)

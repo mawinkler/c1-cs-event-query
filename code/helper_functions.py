@@ -24,6 +24,7 @@ todo:
 """
 
 import json
+import re
 import sys
 import logging
 import requests
@@ -75,7 +76,7 @@ class EventFunctions:
         cursor = ""
         results = []
         while True:
-            url = "https://" + this.c1_url + "/api/container/events/evaluations?" \
+            url = "https://" + this.c1_url + "/api/events/evaluations?" \
                 + "next=" + cursor \
                 + "&limit=" + str(25) \
                 + "&policyName=" + policy_name \
@@ -83,7 +84,7 @@ class EventFunctions:
                 + "&toTime=" + end_time
             post_header = {
                 "Content-Type": "application/json",
-                "api-secret-key": this.api_key,
+                "Authorization": "ApiKey " + this.api_key,
                 "api-version": "v1",
             }
 
@@ -127,16 +128,27 @@ class EventFunctions:
                             for resource in resources:
                                 _LOGGER.debug("Event in scope at timestamp %s",
                                             event.get('timestamp', None))
-                                result = {
-                                    "type": reason.get('type', None),
-                                    "namespace": event.get('namespace', ""),
-                                    "container": resource.get('container', None),
-                                    "pod": resource.get('object', None),
-                                    "image": resource.get('image', None),
-                                    "rule": reason.get('rule', None)
-                                }
-                                if result not in results:
-                                    results.append(result)
+                                # TODO
+                                # Here, I'm circumventing a bug within our exceptions handling
+                                # Currently, our logic is unable to handle image names like
+                                # docker.io/falcosecurity/falco:0.29.0 correctly. Only the bare
+                                # image name "falco" is possible for exceptions with "contains"
+                                # Get the bare image name only (no reg, repo, tag)
+                                image = ""
+                                if resource.get('image', None) is not None:
+                                    image = re.split(':|@', resource.get('image', None).split('/')[-1])[0]
+                                if image != "":
+                                    result = {
+                                        "type": reason.get('type', None),
+                                        "namespace": event.get('namespace', ""),
+                                        "container": resource.get('container', None),
+                                        "pod": resource.get('object', None),
+                                        # "image": resource.get('image', None),
+                                        "image": image,
+                                        "rule": reason.get('rule', None)
+                                    }
+                                    if result not in results:
+                                        results.append(result)
             cursor = response.get('next', "")
             if cursor == "":
                 break
@@ -291,14 +303,15 @@ class PolicyFunctions:
         None
         """
 
-        url = "https://" + self.c1_url + "/api/container/policies?" \
+        url = "https://" + self.c1_url + "/api/policies?" \
             + "&limit=" + str(25)
+        print(self.api_key)
         post_header = {
             "Content-Type": "application/json",
-            "api-secret-key": self.api_key,
+            "Authorization": "ApiKey " + self.api_key,
             "api-version": "v1",
         }
-
+        print(post_header)
         try:
             response = requests.get(
                 url, headers=post_header, verify=True
@@ -350,11 +363,11 @@ class PolicyFunctions:
         ------
         Exception
         """
-        url = "https://" + self.c1_url + "/api/container/policies/" \
+        url = "https://" + self.c1_url + "/api/policies/" \
             + self.policy.get('id', False)
         post_header = {
             "Content-Type": "application/json",
-            "api-secret-key": self.api_key,
+            "Authorization": "ApiKey " + self.api_key,
             "api-version": "v1",
         }
 
@@ -411,14 +424,15 @@ class PolicyFunctions:
 
         # Check, if policy is namespaced
         if self.policy.get('namespaced', False):
+            self.policy['namespaced'] = []
             # Reset all namespaced rules to log and enable them
-            namespaced_id = 0
-            for namespaced in self.policy.get('namespaced', False):
-                _LOGGER.info("Resetting namespaced policy definition for %s",
-                             namespaced.get('name', False))
-                rule_count = len(namespaced.get('rules', False))
-                for rule_id in range(rule_count):
-                    self.policy['namespaced'][namespaced_id]['rules'][rule_id]['action'] = 'log'
-                    self.policy['namespaced'][namespaced_id]['rules'][rule_id]['mitigation'] = 'log'
-                    self.policy['namespaced'][namespaced_id]['rules'][rule_id]['enabled'] = True
-                namespaced_id += 1
+            # namespaced_id = 0
+            # for namespaced in self.policy.get('namespaced', False):
+            #     _LOGGER.info("Resetting namespaced policy definition for %s",
+            #                  namespaced.get('name', False))
+            #     rule_count = len(namespaced.get('rules', False))
+            #     for rule_id in range(rule_count):
+            #         self.policy['namespaced'][namespaced_id]['rules'][rule_id]['action'] = 'log'
+            #         self.policy['namespaced'][namespaced_id]['rules'][rule_id]['mitigation'] = 'log'
+            #         self.policy['namespaced'][namespaced_id]['rules'][rule_id]['enabled'] = True
+            #     namespaced_id += 1

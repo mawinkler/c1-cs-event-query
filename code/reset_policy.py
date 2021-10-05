@@ -50,8 +50,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # API credentials are mounted to /etc
-    c1_url = open('/etc/workload-security-credentials/c1_url', 'r').read()
-    api_key = open('/etc/workload-security-credentials/api_key', 'r').read()
+    c1_url = open('/etc/cloudone-credentials/c1_url', 'r').read()[:-1]
+    api_key = open('/etc/cloudone-credentials/api_key', 'r').read()[:-1]
 
     policy_functions = PolicyFunctions(c1_url, api_key)
 
