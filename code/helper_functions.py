@@ -305,27 +305,25 @@ class PolicyFunctions:
 
         url = "https://container." + self.c1_url + "/api/policies?" \
             + "&limit=" + str(25)
-        print(self.api_key)
         post_header = {
             "Content-Type": "application/json",
             "Authorization": "ApiKey " + self.api_key,
             "api-version": "v1",
         }
-        print(post_header)
         try:
             response = requests.get(
                 url, headers=post_header, verify=True
             )
             response.raise_for_status()
         except requests.exceptions.Timeout as err:
-            print(response.text)
+            _LOGGER.error(response.text)
             raise SystemExit(err)
         except requests.exceptions.HTTPError as err:
-            print(response.text)
+            _LOGGER.error(response.text)
             raise SystemExit(err)
         except requests.exceptions.RequestException as err:
             # catastrophic error. bail.
-            print(response.text)
+            _LOGGER.error(response.text)
             raise SystemExit(err)
 
         response = response.json()
@@ -380,7 +378,6 @@ class PolicyFunctions:
             response = requests.post(
                 url, headers=post_header, data=json.dumps(self.policy), verify=True
             )
-            # print(response.text)
             response.raise_for_status()
         except requests.exceptions.Timeout as err:
             _LOGGER.error(response.text)

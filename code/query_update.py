@@ -129,7 +129,7 @@ def print_tables(reasons):
                         reason.get('container', 'n/a'),
                         reason.get('rule', 'n/a')
                     ])
-            print("\nEvent Type: {}\n{}".format(event_type.upper(), table))
+            _LOGGER.debug("\nEvent Type: {}\n{}".format(event_type.upper(), table))
     else:
         _LOGGER.info("No evaluations found.")
 
