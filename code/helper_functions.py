@@ -76,7 +76,7 @@ class EventFunctions:
         cursor = ""
         results = []
         while True:
-            url = "https://" + this.c1_url + "/api/events/evaluations?" \
+            url = "https://container." + this.c1_url + "/api/events/evaluations?" \
                 + "next=" + cursor \
                 + "&limit=" + str(25) \
                 + "&policyName=" + policy_name \
@@ -303,7 +303,7 @@ class PolicyFunctions:
         None
         """
 
-        url = "https://" + self.c1_url + "/api/policies?" \
+        url = "https://container." + self.c1_url + "/api/policies?" \
             + "&limit=" + str(25)
         print(self.api_key)
         post_header = {
@@ -363,7 +363,7 @@ class PolicyFunctions:
         ------
         Exception
         """
-        url = "https://" + self.c1_url + "/api/policies/" \
+        url = "https://container." + self.c1_url + "/api/policies/" \
             + self.policy.get('id', False)
         post_header = {
             "Content-Type": "application/json",

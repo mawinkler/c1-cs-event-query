@@ -82,8 +82,8 @@ logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 # API credentials are mounted to /etc
-c1_url = open('/etc/cloudone-credentials/c1_url', 'r').read()[:-1]
-api_key = open('/etc/cloudone-credentials/api_key', 'r').read()[:-1]
+c1_url = open('/etc/cloudone-credentials/c1_url', 'r').read().rstrip('\n')
+api_key = open('/etc/cloudone-credentials/api_key', 'r').read().rstrip('\n')
 
 event_functions = EventFunctions(c1_url, api_key)
 policy_functions = PolicyFunctions(c1_url, api_key)

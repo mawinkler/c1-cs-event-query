@@ -66,7 +66,7 @@ and
 
 pointing to your Cloud One API endpoint, e.g.
 
-`container.trend-us-1.cloudone.trendmicro.com:443`
+`trend-us-1.cloudone.trendmicro.com:443`
 
 ## Analyze Evaluations
 
