@@ -64,12 +64,9 @@ todo:
 """
 
 import argparse
-import re
 import sys
 import logging
 from argparse import RawDescriptionHelpFormatter
-from datetime import datetime, timedelta
-import requests
 from prettytable import PrettyTable
 from helper_functions import EventFunctions, PolicyFunctions
 
@@ -120,6 +117,7 @@ def print_tables(reasons):
             table.field_names = ['namespace', 'pod', 'image', 'container', 'rule']
             for column in table.field_names:
                 table.align[column] = "l"
+            event_count = 0
             for reason in reasons:
                 if reason.get('type', None) == event_type:
                     table.add_row([
@@ -129,7 +127,8 @@ def print_tables(reasons):
                         reason.get('container', 'n/a'),
                         reason.get('rule', 'n/a')
                     ])
-            _LOGGER.debug("\nEvent Type: {}\n{}".format(event_type.upper(), table))
+                    event_count += 1
+            _LOGGER.info("\nEvent Type: {}, Event Count: {}\n{}".format(event_type.upper(), event_count, table))
     else:
         _LOGGER.info("No evaluations found.")
 
