@@ -7,10 +7,6 @@
     - [Build](#build)
     - [Run](#run)
   - [Usage - Analyze Evaluations](#usage---analyze-evaluations)
-  - [Deployment of Container Security](#deployment-of-container-security)
-    - [Create a new policy](#create-a-new-policy)
-    - [Add a cluster (w/o runtime)](#add-a-cluster-wo-runtime)
-    - [Add scanner](#add-scanner)
   - [Planned functionality](#planned-functionality)
     - [Patch deployment to local registry](#patch-deployment-to-local-registry)
   - [Support](#support)
@@ -164,41 +160,7 @@ docker run --rm \
 2022-01-13 16:41:44 INFO (MainThread) [print_tables] 
 ```
 
-## Deployment of Container Security
-
-First, head over to Container Security within Cloud One, then create a policy for your cluster.
-
-### Create a new policy
-
-Don't care on the chapters *Pod properties* and *Container properties* for now - leave them as they are.
-
-If you have requirements for *Image properties* like, you only want to allow images deployed from specific registries, configure them now. An example could be:
-
-```txt
-Log images from registries with names that do not equal 172.19.255.1:5000/
-```
-
-or
-
-```txt
-Log images with tags that equal latest
-```
-
-Same applies to Scan results.
-
-Next, you should enable all controls in `log` mode for which you can do by running the `reset_policy.py`-script. The script will reset the cluster-wide policy and all namespaced policies.
-
-```sh
-./reset_policy.py -p POLICY
-```
-
-### Add a cluster (w/o runtime)
-
-Add a cluster following the documentation with `helm install...` and assign the previously created policy.
-
-### Add scanner
-
-Add a scanner following the documentation with `helm install...`.
+Container Security Continuous should now ignore policy violations in the given namespace.
 
 ## Planned functionality
 
