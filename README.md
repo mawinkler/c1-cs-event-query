@@ -1,18 +1,170 @@
 # Container Security Quick Setup Guide
 
 - [Container Security Quick Setup Guide](#container-security-quick-setup-guide)
-  - [Deployment](#deployment)
+  - [Requirements](#requirements)
+  - [Setup Cloud One API Endpoint](#setup-cloud-one-api-endpoint)
+  - [Run Environment: Docker](#run-environment-docker)
+    - [Build](#build)
+    - [Run](#run)
+  - [Usage - Analyze Evaluations](#usage---analyze-evaluations)
+  - [Deployment of Container Security](#deployment-of-container-security)
     - [Create a new policy](#create-a-new-policy)
     - [Add a cluster (w/o runtime)](#add-a-cluster-wo-runtime)
     - [Add scanner](#add-scanner)
-    - [Setup Cloud One API Endpoint](#setup-cloud-one-api-endpoint)
-  - [Analyze Evaluations](#analyze-evaluations)
-  - [TODO](#todo)
+  - [Planned functionality](#planned-functionality)
     - [Patch deployment to local registry](#patch-deployment-to-local-registry)
   - [Support](#support)
   - [Contribute](#contribute)
 
-## Deployment
+## Requirements
+
+- Running and configured Cloud One Container Security instance
+- Cloud One Api Key with full access
+
+## Setup Cloud One API Endpoint
+
+Locally, on your system create the following two files:
+
+`/etc/cloudone-credentials/api_key`
+
+containing your Cloud One API Key
+
+`1wxxxxxxxxxxxxxxxxxxxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+
+and
+
+`/etc/cloudone-credentials/c1_url`
+
+pointing to your Cloud One API endpoint, e.g.
+
+`us-1.cloudone.trendmicro.com:443`
+
+## Run Environment: Docker
+
+### Build
+
+```sh
+docker build -t c1cs-query-update .
+```
+
+### Run
+
+```sh
+docker run --rm \
+  -v /etc/cloudone-credentials:/etc/cloudone-credentials:ro \
+  c1cs-query-update -c CLUSTER_NAME -p POLICY_NAME ...
+```
+
+> If you don't want to build the image yourself just use the image name `mawinkler/c1cs-query-update`.
+## Usage - Analyze Evaluations
+
+Wait at least 30 minutes, so that the continuous module of Container Security has generated the first events.
+
+I recommend to use this tool on a per-namespace basis, like this:
+
+```sh
+docker run --rm \
+  -v /etc/cloudone-credentials:/etc/cloudone-credentials:ro \
+  c1cs-query-update -c playground_gke -p relaxed_playground_gke -n falco
+```
+
+This will return you something like this:
+
+```sh
+2022-01-13 16:41:06 INFO (MainThread) [<module>] Collecting evaluation event reasons
+2022-01-13 16:41:06 INFO (MainThread) [collect_reasons] Start time: 2022-01-13T15:41:06Z
+2022-01-13 16:41:06 INFO (MainThread) [collect_reasons] End time: 2022-01-13T16:41:06Z
+2022-01-13 16:41:09 INFO (MainThread) [collect_reasons] Number of filtered reasons: 30
+2022-01-13 16:41:09 INFO (MainThread) [extract_images] Number of violating images: 30
+2022-01-13 16:41:09 INFO (MainThread) [print_tables] 
+Event Type: REGISTRY, Event Count: 27
++-------------+--------------------------------------------------------+-------------------------------------+---------------------------+------------+
+| namespace   | pod                                                    | image                               | container                 | rule       |
++-------------+--------------------------------------------------------+-------------------------------------+---------------------------+------------+
+| prometheus  | alertmanager-prometheus-kube-prometheus-alertmanager-0 | alertmanager                        | alertmanager              | not-equals |
+| prometheus  | alertmanager-prometheus-kube-prometheus-alertmanager-0 | prometheus-config-reloader          | config-reloader           | not-equals |
+| kube-system | event-exporter-gke-5479fd58c8-pq8nw                    | event-exporter                      | event-exporter            | not-equals |
+| kube-system | event-exporter-gke-5479fd58c8-pq8nw                    | prometheus-to-sd                    | prometheus-to-sd-exporter | not-equals |
+| falco       | falco-exporter-h7m8x                                   | falco-exporter                      | falco-exporter            | not-equals |
+| falco       | falco-falcosidekick-797d4c5d8-ns45j                    | falcosidekick                       | falcosidekick             | not-equals |
+| falco       | falco-falcosidekick-ui-67749c4fb5-s5hhn                | falcosidekick-ui                    | falcosidekick             | not-equals |
+| kube-system | fluentbit-gke-7wx4l                                    | fluent-bit                          | fluentbit                 | not-equals |
+| kube-system | fluentbit-gke-7wx4l                                    | fluent-bit-gke-exporter             | fluentbit-gke             | not-equals |
+| kube-system | gke-metrics-agent-pxkrr                                | gke-metrics-agent                   | gke-metrics-agent         | not-equals |
+| kube-system | konnectivity-agent-9868c489c-tsxk6                     | proxy-agent                         | konnectivity-agent        | not-equals |
+| kube-system | konnectivity-agent-autoscaler-698b6d8768-4mjl6         | cluster-proportional-autoscaler     | autoscaler                | not-equals |
+| kube-system | kube-dns-697dc8fc8b-n2598                              | k8s-dns-kube-dns                    | kubedns                   | not-equals |
+| kube-system | kube-dns-697dc8fc8b-n2598                              | k8s-dns-dnsmasq-nanny               | dnsmasq                   | not-equals |
+| kube-system | kube-dns-697dc8fc8b-n2598                              | k8s-dns-sidecar                     | sidecar                   | not-equals |
+| kube-system | kube-dns-697dc8fc8b-n2598                              | prometheus-to-sd                    | prometheus-to-sd          | not-equals |
+| kube-system | l7-default-backend-7db896cb4-z2dg5                     | ingress-gce-404-server-with-metrics | default-http-backend      | not-equals |
+| kube-system | metrics-server-v0.4.4-857776bc9c-9snww                 | metrics-server                      | metrics-server            | not-equals |
+| kube-system | metrics-server-v0.4.4-857776bc9c-9snww                 | addon-resizer                       | metrics-server-nanny      | not-equals |
+| nginx       | nginx-6799fc88d8-dvg2w                                 | nginx                               | nginx                     | not-equals |
+| kube-system | pdcsi-node-5mlqf                                       | csi-node-driver-registrar           | csi-driver-registrar      | not-equals |
+| prometheus  | prometheus-grafana-6ccf94f848-26nn8                    | k8s-sidecar                         | grafana-sc-dashboard      | not-equals |
+| prometheus  | prometheus-grafana-6ccf94f848-26nn8                    | grafana                             | grafana                   | not-equals |
+| prometheus  | prometheus-kube-prometheus-operator-57ddd6fcfb-bmtnl   | prometheus-operator                 | kube-prometheus-stack     | not-equals |
+| prometheus  | prometheus-kube-state-metrics-79f9cf87df-vlbqr         | kube-state-metrics                  | kube-state-metrics        | not-equals |
+| prometheus  | prometheus-prometheus-kube-prometheus-prometheus-0     | prometheus                          | prometheus                | not-equals |
+| prometheus  | prometheus-prometheus-node-exporter-5k69x              | node-exporter                       | node-exporter             | not-equals |
++-------------+--------------------------------------------------------+-------------------------------------+---------------------------+------------+
+2022-01-13 16:41:09 INFO (MainThread) [print_tables] 
+Event Type: CONTAINERSECURITYCONTEXT, Event Count: 3
++-------------+------------------------------------------------------+----------------------------------------+---------------+------------+
+| namespace   | pod                                                  | image                                  | container     | rule       |
++-------------+------------------------------------------------------+----------------------------------------+---------------+------------+
+| falco       | falco-4x7b8                                          | falco                                  | falco         | privileged |
+| kube-system | kube-proxy-gke-playground-default-pool-fa5fe362-clp6 | kube-proxy-amd64                       | kube-proxy    | privileged |
+| kube-system | pdcsi-node-5mlqf                                     | gcp-compute-persistent-disk-csi-driver | gce-pd-driver | privileged |
++-------------+------------------------------------------------------+----------------------------------------+---------------+------------+
+2022-01-13 16:41:09 INFO (MainThread) [<module>] Done
+```
+
+You will get potentially multiple tables, each introduced by a discoverd `Event Type` like `UNSCANNEDIMAGE`, `REGISTRY` or `CONTAINERSECURITYCONTEXT`
+
+Within the table the policy violating image is shown. Verify this and if you want to set image-based exceptions rerun the script with one of the two update flags `-un` or `-uc`.
+
+The `-un` modifies the cluster policy to a namespaced policy (if it wasn't before) and creates a namespaced policy with the same settings as the cluster-wide policy, but set's exceptions for the images identifies during the analysis.
+
+`-uc` effectively does the same, but directly modifies the cluster-wide policy. In both variants, existing exceptions will not be overwritten.
+
+```sh
+docker run --rm \
+  -v /etc/cloudone-credentials:/etc/cloudone-credentials:ro \
+  c1cs-query-update -c playground_gke -p relaxed_playground_gke -n kube-system -un
+```
+
+```sh
+2022-01-13 16:41:40 INFO (MainThread) [<module>] Collecting evaluation event reasons
+2022-01-13 16:41:40 INFO (MainThread) [collect_reasons] Start time: 2022-01-13T15:41:40Z
+2022-01-13 16:41:40 INFO (MainThread) [collect_reasons] End time: 2022-01-13T16:41:40Z
+2022-01-13 16:41:43 INFO (MainThread) [collect_reasons] Number of filtered reasons: 17
+2022-01-13 16:41:43 INFO (MainThread) [extract_images] Number of violating images: 17
+2022-01-13 16:41:44 INFO (MainThread) [pull_policy] Total number of policies: 2
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Updating namespaced policy
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for event-exporter
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for prometheus-to-sd
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for fluent-bit
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for fluent-bit-gke-exporter
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for gke-metrics-agent
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for proxy-agent
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for cluster-proportional-autoscaler
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for k8s-dns-kube-dns
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for k8s-dns-dnsmasq-nanny
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for k8s-dns-sidecar
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for prometheus-to-sd
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for ingress-gce-404-server-with-metrics
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for metrics-server
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for addon-resizer
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for csi-node-driver-registrar
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for kube-proxy-amd64
+2022-01-13 16:41:44 INFO (MainThread) [policy_add_exceptions] Adding image exception for gcp-compute-persistent-disk-csi-driver
+2022-01-13 16:41:44 INFO (MainThread) [<module>] Updating policy
+2022-01-13 16:41:44 INFO (MainThread) [print_tables] 
+```
+
+## Deployment of Container Security
 
 First, head over to Container Security within Cloud One, then create a policy for your cluster.
 
@@ -48,86 +200,7 @@ Add a cluster following the documentation with `helm install...` and assign the 
 
 Add a scanner following the documentation with `helm install...`.
 
-### Setup Cloud One API Endpoint
-
-> Note: This repo is using the new authentication system of Cloud One with e-Mail & password.
-
-Locally, on your system create the following two files:
-
-`/etc/cloudone-credentials/api_key`
-
-containing your Cloud One API Key
-
-`1wxxxxxxxxxxxxxxxxxxxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
-
-and
-
-`/etc/cloudone-credentials/c1_url`
-
-pointing to your Cloud One API endpoint, e.g.
-
-`trend-us-1.cloudone.trendmicro.com:443`
-
-## Analyze Evaluations
-
-Wait at least 30 minutes, so that the continuous module of Container Security has generated the first events.
-
-To ease your analysis, you can use the python script `query_update.py`.
-
-I recommend to use this script on a per-namespace basis, like this:
-
-```sh
-./query_update.py -c playground_ubuntu -p relaxed_playground -n falco
-```
-
-This will return you something like this:
-
-```sh
-Event Type: UNSCANNEDIMAGE
-+-----------+-----------------------------------------+---------------------------------------+----------------+------+
-| namespace | pod                                     | image                                 | container      | rule |
-+-----------+-----------------------------------------+---------------------------------------+----------------+------+
-| falco     | falco-exporter-zptrz                    | falcosecurity/falco-exporter:0.5.0    | falco-exporter | None |
-| falco     | falco-falcosidekick-5cbc97b7d9-6m5vk    | falcosecurity/falcosidekick:2.23.1    | falcosidekick  | None |
-| falco     | falco-falcosidekick-5cbc97b7d9-rfqh9    | falcosecurity/falcosidekick:2.23.1    | falcosidekick  | None |
-| falco     | falco-falcosidekick-ui-79c4d8b546-mv9sg | falcosecurity/falcosidekick-ui:v1.1.0 | falcosidekick  | None |
-| falco     | falco-th96v                             | docker.io/falcosecurity/falco:0.29.0  | falco          | None |
-+-----------+-----------------------------------------+---------------------------------------+----------------+------+
-
-Event Type: CONTAINERSECURITYCONTEXT
-+-----------+-------------+--------------------------------------+-----------+------------+
-| namespace | pod         | image                                | container | rule       |
-+-----------+-------------+--------------------------------------+-----------+------------+
-| falco     | falco-th96v | docker.io/falcosecurity/falco:0.29.0 | falco     | privileged |
-+-----------+-------------+--------------------------------------+-----------+------------+
-```
-
-You will get potentially multiple tables, each introduced by a discoverd `Event Type` like `UNSCANNEDIMAGE` or `CONTAINERSECURITYCONTEXT`
-
-Within the table the policy violating image is shown. Verify this and if you want to set image-based exceptions rerun the script with one of the two update flags `-un` or `-uc`. The `-un` modifies the cluster policy to a namespaced policy (if it wasn't before) and creates a namespaced policy with the same settings as the cluster-wide policy, but set's exceptions for the images identifies during the analysis. `-uc` effectively does the same, but directly modifies the cluster-wide policy. In both variants, existing exceptions will not be overwritten.
-
-```sh
-./query_update.py -c playground_ubuntu -p relaxed_playground -n falco -un
-```
-
-```sh
-2021-07-01 17:18:06 INFO (MainThread) [<module>] Collecting evaluation event reasons
-2021-07-01 17:18:06 INFO (MainThread) [collect_reasons] Start time: 2021-07-01T14:18:06Z
-2021-07-01 17:18:06 INFO (MainThread) [collect_reasons] End time: 2021-07-01T15:18:06Z
-2021-07-01 17:18:07 INFO (MainThread) [collect_reasons] Number of filtered reasons: 6
-2021-07-01 17:18:07 INFO (MainThread) [<module>] Extracting image names
-2021-07-01 17:18:07 INFO (MainThread) [extract_images] Number of violating images: 4
-2021-07-01 17:18:08 INFO (MainThread) [pull_policy] Total number of policies: 3
-2021-07-01 17:18:08 INFO (MainThread) [policy_add_exceptions] Updating namespaced policy
-2021-07-01 17:18:08 INFO (MainThread) [policy_add_exceptions] Policy relaxed_playground is now a namespaced policy for namespace falco
-2021-07-01 17:18:08 INFO (MainThread) [policy_add_exceptions] Adding image exception for falcosecurity/falco-exporter:0.5.0
-2021-07-01 17:18:08 INFO (MainThread) [policy_add_exceptions] Adding image exception for falcosecurity/falcosidekick:2.23.1
-2021-07-01 17:18:08 INFO (MainThread) [policy_add_exceptions] Adding image exception for falcosecurity/falcosidekick-ui:v1.1.0
-2021-07-01 17:18:08 INFO (MainThread) [policy_add_exceptions] Adding image exception for docker.io/falcosecurity/falco:0.29.0
-2021-07-01 17:18:08 INFO (MainThread) [<module>] Updating policy
-```
-
-## TODO
+## Planned functionality
 
 ### Patch deployment to local registry
 

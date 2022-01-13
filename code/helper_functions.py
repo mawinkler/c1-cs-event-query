@@ -28,6 +28,9 @@ import re
 import sys
 import logging
 import requests
+from kubernetes.client.rest import ApiException
+from kubernetes import client, config
+import pprint
 from datetime import datetime, timedelta
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,6 +46,8 @@ class EventFunctions:
     def __init__(self, c1_url, api_key):
         self.c1_url = c1_url
         self.api_key = api_key
+        # self.config = config.load_kube_config()
+        # self.api_instance = client.CoreV1Api()
 
     def collect_reasons(this, cluster_name, decision, mitigation, namespace, policy_name):
         """
@@ -134,20 +139,33 @@ class EventFunctions:
                                 # docker.io/falcosecurity/falco:0.29.0 correctly. Only the bare
                                 # image name "falco" is possible for exceptions with "contains"
                                 # Get the bare image name only (no reg, repo, tag)
+                                image_full = ""
+                                repo = ""
                                 image = ""
+                                tag = ""
                                 if resource.get('image', None) is not None:
-                                    image = re.split(':|@', resource.get('image', None).split('/')[-1])[0]
+                                    image_full = resource.get('image', None)
+                                    repo = image_full.rsplit('/', 1)[0]
+                                    image = re.split(':|@', image_full.split('/')[-1])[0]
+                                    if '@' in image_full:
+                                        tag = re.split('@', image_full.split('/')[-1])[1]
+                                    elif ':' in image_full:
+                                        tag = re.split(':', image_full.split('/')[-1])[1]
                                 if image != "":
                                     result = {
                                         "type": reason.get('type', None),
                                         "namespace": event.get('namespace', ""),
                                         "container": resource.get('container', None),
                                         "pod": resource.get('object', None),
-                                        # "image": resource.get('image', None),
+                                        "image_full": image_full,
+                                        "repo": repo,
                                         "image": image,
+                                        "tag": tag,
                                         "rule": reason.get('rule', None)
                                     }
-                                    if result not in results:
+
+                                    # if result not in results:
+                                    if not any(image_full == e['image_full'] for e in results):
                                         results.append(result)
             cursor = response.get('next', "")
             if cursor == "":
@@ -195,13 +213,36 @@ class EventFunctions:
                     if reason.get('type', None) == event_type:
                         if reason.get('image', None) not in images \
                         and reason.get('image', None) is not None:
-                            images.append(reason.get('image', None))
+                            # pprint.pprint(reason)
+                            images.append({"image_full": reason.get('image_full', None),
+                                           "repo": reason.get('repo', None),
+                                           "image": reason.get('image', None),
+                                           "tag": reason.get('tag', None)})
         else:
             _LOGGER.info("No evaluations found.")
 
         _LOGGER.info("Number of violating images: %d", len(images))
 
         return images
+
+
+# class KubernetesFunctions:
+#     """Some function to help dealing with events"""
+
+#     def __init__(self):
+#         self.config = config.load_kube_config()
+#         self.api_instance = client.CoreV1Api()
+
+#     def get_images_from_pod(this, namespace="smartcheck"):
+
+#         pod_name="image-scan-6ccf44df99-gxksg"
+#         images = ()
+#         try:
+#             containers = this.api_instance.read_namespaced_pod(name=pod_name, namespace=namespace).spec.containers
+#             for container in containers:
+#                 pprint.pprint(container.image) #['container_statuses'])
+#         except ApiException as e:
+#             print(e)
 
 class PolicyFunctions:
     """Some functions to help dealing with policies"""

@@ -69,6 +69,7 @@ import logging
 from argparse import RawDescriptionHelpFormatter
 from prettytable import PrettyTable
 from helper_functions import EventFunctions, PolicyFunctions
+#, KubernetesFunctions
 
 # Globals
 _LOGGER = logging.getLogger(__name__)
@@ -84,7 +85,7 @@ api_key = open('/etc/cloudone-credentials/api_key', 'r').read().rstrip('\n')
 
 event_functions = EventFunctions(c1_url, api_key)
 policy_functions = PolicyFunctions(c1_url, api_key)
-
+# kubernetes_function = KubernetesFunctions()
 
 def print_tables(reasons):
     """
@@ -130,7 +131,7 @@ def print_tables(reasons):
                     event_count += 1
             _LOGGER.info("\nEvent Type: {}, Event Count: {}\n{}".format(event_type.upper(), event_count, table))
     else:
-        _LOGGER.info("No evaluations found.")
+        _LOGGER.debug("No evaluations found.")
 
 def policy_add_exceptions(image_exceptions,
                           namespace='default',
@@ -162,7 +163,7 @@ def policy_add_exceptions(image_exceptions,
                 ],
                 "rules": configured_policy['default']['rules']
             }]
-            _LOGGER.info("Policy %s is now a namespaced policy for namespace %s",
+            _LOGGER.debug("Policy %s is now a namespaced policy for namespace %s",
                          configured_policy.get('name'), namespace)
 
         # Check, if namespaced policy already covers the namespace
@@ -174,7 +175,7 @@ def policy_add_exceptions(image_exceptions,
                 ],
                 "rules": configured_policy['default']['rules']
             })
-            _LOGGER.info("Namespaced policy for namespace %s added", namespace)
+            _LOGGER.debug("Namespaced policy for namespace %s added", namespace)
 
         # Check, if all exceptions for the given list of images is set to the policy
         ruleset_id = 0
@@ -185,11 +186,11 @@ def policy_add_exceptions(image_exceptions,
                     exceptions = []
                 for exception in exceptions:
                     for image_exception in image_exceptions:
-                        if image_exception == exception.get('statement', False).get('value', False):
+                        if image_exception.get('image', 'n/a') == exception.get('statement', False).get('value', False):
                             image_exceptions.remove(image_exception)
-                            _LOGGER.info("Exception for %s already exists", image_exception)
+                            _LOGGER.debug("Exception for %s already exists", image_exception.get('image', 'n/a'))
                 for image in image_exceptions:
-                    _LOGGER.info("Adding image exception for %s", image)
+                    _LOGGER.info("Adding image exception for %s", image.get('image', 'n/a'))
                     exceptions.append(
                         {
                             "action": "log",
@@ -198,10 +199,22 @@ def policy_add_exceptions(image_exceptions,
                             "enabled": True,
                             "statement": {
                                 "key": "contains",
-                                "value": image
+                                "value": image.get('image', 'n/a')
                             }
                         }
                     )
+                    # exceptions.append(
+                    #     {
+                    #         "action": "log",
+                    #         "mitigation": "log",
+                    #         "type": "tag",
+                    #         "enabled": True,
+                    #         "statement": {
+                    #             "key": "contains",
+                    #             "value": image.get('tag', 'n/a')
+                    #         }
+                    #     }
+                    # )
                 break
             ruleset_id += 1
 
@@ -217,7 +230,7 @@ def policy_add_exceptions(image_exceptions,
             for image_exception in image_exceptions:
                 if image_exception == exception.get('statement', False).get('value', False):
                     image_exceptions.remove(image_exception)
-                    _LOGGER.info("Exception for %s already exists", image_exception)
+                    _LOGGER.debug("Exception for %s already exists", image_exception)
         for image in image_exceptions:
             _LOGGER.info("Adding image exception for %s cluster-wide", image)
             exceptions.append(
@@ -280,9 +293,11 @@ if __name__ == '__main__':
     if (args.update_namespaced or args.update_cluster_wide) and args.namespace == 'all':
         raise SystemExit("error: updating the policy requires a defined namespace")
 
+    # kubernetes_function.get_images_from_pod("smartcheck")
+
     _LOGGER.info("Collecting evaluation event reasons")
     reasons = event_functions.collect_reasons(args.cluster_name, args.decision, args.mitigation, args.namespace, args.policy)
-    _LOGGER.info("Extracting image names")
+    _LOGGER.debug("Extracting image names")
     violating_images = event_functions.extract_images(reasons)
 
     if args.update_namespaced or args.update_cluster_wide:
