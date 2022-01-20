@@ -151,6 +151,7 @@ class EventFunctions:
                                 tag = ""
                                 if resource.get('image', None) is not None:
                                     image_full = resource.get('image', None)
+                                    print(image_full)
                                     repo = image_full.rsplit('/', 1)[0]
                                     image = re.split(':|@', image_full.split('/')[-1])[0]
                                     if '@' in image_full:
@@ -171,7 +172,8 @@ class EventFunctions:
                                     }
 
                                     # if result not in results:
-                                    if not any(image_full == e['image_full'] for e in results):
+                                    # if not any(image_full == e['image_full'] for e in results):
+                                    if not any(image == e['image'] for e in results):
                                         results.append(result)
             cursor = response.get('next', "")
             if cursor == "":
