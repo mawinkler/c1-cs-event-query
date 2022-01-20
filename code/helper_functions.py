@@ -32,6 +32,7 @@ from kubernetes.client.rest import ApiException
 from kubernetes import client, config
 import pprint
 from datetime import datetime, timedelta
+import time
 
 _LOGGER = logging.getLogger(__name__)
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
@@ -72,8 +73,12 @@ class EventFunctions:
         """
 
         # The interval for continuous rescans of the cluster is 60 minutes by default
-        start_time = (datetime.utcnow() - timedelta(minutes=60)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        end_time = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        # offset = time.timezone if (time.localtime().tm_isdst == 0) else time.altzone
+        # offset = offset / 60 / 60 * (-1)
+        offset = 0
+        # _LOGGER.info("Timezone offset: %s", str(offset))
+        start_time = (datetime.utcnow() - timedelta(minutes=60) + timedelta(hours=offset)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        end_time = (datetime.utcnow() + timedelta(hours=offset)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         _LOGGER.info("Start time: %s", start_time)
         _LOGGER.info("End time: %s", end_time)
@@ -124,7 +129,8 @@ class EventFunctions:
                 for event in response.get('events', {}):
                     if event.get('clusterName', "") == cluster_name \
                     and event.get('decision', "") == decision \
-                    and event.get('mitigation', "") == mitigation \
+                    and (event.get('mitigation', "") == mitigation
+                        or event.get('mitigation', "") == "") \
                     and (event.get('namespace', "") == namespace \
                         or namespace == 'all'):
                         reasons = event.get('reasons', {})
